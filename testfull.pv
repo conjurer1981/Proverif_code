@@ -1,0 +1,327 @@
+(*--------channels----------*)
+free ch1: channel.
+free ch2: channel.
+free ch3: channel.
+free ch4: channel.
+free sch1: channel [private].
+free sch2: channel [private].
+free sch3: channel [private].
+free sch4: channel [private].
+
+
+(*-------shared keys--------*)
+free skij: bitstring [private].
+free skji: bitstring [private].
+free skui: bitstring [private].
+free skiu: bitstring [private].
+free skvi: bitstring [private].
+free skiv: bitstring [private].
+free s: bitstring [private].
+
+type pair.
+fun con2(bitstring): pair. 
+fun fst(pair): bitstring.
+fun snd(pair): bitstring.
+
+
+(*--------functions------*)
+fun h(bitstring):bitstring.
+fun con(bitstring,bitstring):bitstring.
+fun add(bitstring,bitstring):bitstring.
+fun mul(bitstring,bitstring):bitstring.
+fun xor(bitstring,bitstring):bitstring.
+fun rec(bitstring,bitstring):bitstring.
+fun trans(bitstring):bitstring.
+
+
+(*-----constants------------*)
+free VIDi:bitstring[private].
+free PWi:bitstring[private].
+free ri:bitstring[private].
+
+const GIDj:bitstring.
+const GIDu:bitstring.
+const GIDv:bitstring.
+const CCID:bitstring.
+const B:bitstring.
+table d(bitstring).
+
+weaksecret VIDi.
+weaksecret PWi.
+
+
+equation forall m:bitstring,n:bitstring; xor(xor(m,n),n)=m.
+
+event EV_start1(bitstring).
+event EV_auth1(bitstring).
+event EV_start2(bitstring).
+event EV_auth2(bitstring).
+event EV_start3(bitstring).
+event EV_auth3(bitstring).
+event GS_start1(bitstring).
+event GS_auth1(bitstring).
+event GS_start2(bitstring).
+event GS_auth2(bitstring).
+event GS_start3(bitstring).
+event GS_auth3(bitstring).
+
+
+
+query attacker (VIDi).
+query attacker (PWi).
+query attacker (skij).
+query attacker (skji).
+query attacker (skui).
+query attacker (skiu).
+query attacker (skiv).
+query attacker (skvi).
+query attacker (s).
+
+query x:bitstring; inj-event(EV_auth1(x))==>inj-event(EV_start1(x)).
+query x:bitstring; inj-event(EV_auth2(x))==>inj-event(EV_start2(x)).
+query x:bitstring; inj-event(EV_auth3(x))==>inj-event(EV_start1(x)).
+query x:bitstring; inj-event(GS_auth1(x))==>inj-event(GS_start1(x)).
+query x:bitstring; inj-event(GS_auth2(x))==>inj-event(GS_start2(x)).
+query x:bitstring; inj-event(GS_auth3(x))==>inj-event(GS_start3(x)).
+
+
+
+(*------EV process---------*)
+let EV=
+  new ri:bitstring;
+  let HPWi = h(con(ri,PWi)) in
+  out(sch1,(VIDi,HPWi));
+  in(sch1,(RI1:bitstring,RI2:bitstring,PIDi:bitstring));
+  let RI3 = xor(h(con(VIDi,HPWi)),ri)  in
+  !
+  (
+    (*---intial authentication--*)
+  event EV_start1(VIDi);
+  new si:bitstring;
+  new ei:bitstring;
+  new ai:bitstring;
+  new ti:bitstring;
+  
+  let ri1 = xor(RI3,h(con(VIDi,PWi))) in
+  let HPWi1 = h(con(ri1,PWi)) in
+  let pi = add(mul(B,si),ei) in
+  let A1 = xor(xor(RI1,HPWi1),ai) in 
+  let A2 = xor(h(con(PIDi,ai)),VIDi) in
+  let A3 = h(con(con(con(con(con(PIDi,VIDi),GIDj),ai),h(pi)),ti)) in
+  let M1 = (PIDi,pi,A1,A2,A3,ti) in 
+  out(ch1,M1);
+  
+  in (ch1,(EVA8:bitstring,EVA10:bitstring,EVA11:bitstring,EVpj:bitstring,EVvj:bitstring,EVA13:bitstring,EVA14:bitstring,EVA15:bitstring,EVtCC:bitstring));
+  let A16 = xor(EVA8,h(con(ai,PIDi))) in
+  let PIDinew = xor(EVA10,h(con(xor(RI2,h(con(VIDi,HPWi1))),ai))) in
+  if EVA11 = h(con(con(con(con(PIDinew,VIDi),A16),ai),EVtCC)) then
+  new ei2:bitstring;
+  let bi = add(mul(trans(EVpj),si),ei2) in
+  let ki = rec(bi,EVvj) in 
+  let skij = h(con(con(con(pi,EVpj),EVvj),ki)) in
+  let EVTj = xor(EVA13,h(con(EVpj,ki))) in
+  let TIDiu = xor(EVA14,h(con(ki,EVpj))) in
+  if EVA15 = h(con(con(con(con(con(GIDj,PIDi),skij),EVTj),TIDiu),EVtCC)) then
+  let RI1new = xor(A16,HPWi1) in
+  let RI1 = RI1new in
+  let PIDi = PIDinew in
+
+  (*-----handover----*)
+  event EV_start2(TIDiu);
+  new siu:bitstring;
+  new eiu:bitstring;
+  new tiu:bitstring;
+  let piu = add(mul(B,siu),eiu) in
+  let B1 = xor(h(con(piu,h(con(con(TIDiu,EVTj),GIDu)))),EVTj) in 
+  let B2 = h(con(con(con(con(TIDiu,GIDu),piu),EVTj),tiu)) in
+  let M5 = (TIDiu,B1,B2,piu,tiu) in  
+  out(ch3,M5);
+
+  in(ch3,(EVpu:bitstring,EVvu:bitstring,EVB3:bitstring,EVB4:bitstring,EVB5:bitstring,EVtGSu:bitstring));
+  new eiu2:bitstring;
+  let biu = add(mul(trans(EVpu),siu),eiu2) in
+  let kiu = rec(biu,EVvu) in
+  let skiu = h(con(con(con(piu,EVpu),EVvu),kiu)) in
+  let EVTu = xor(EVB3,h(con(EVpu,kiu))) in 
+  let TIDiv = xor(EVB4,h(con(kiu,EVpu))) in
+  if EVB5 = h(con(con(con(con(con(GIDu,TIDiv),skiu),EVTu),TIDiv),EVtGSu)) then
+  event GS_auth2(GIDu);
+
+  (*---handover at last GSv--*)
+  event EV_start2(TIDiv);
+  new siv:bitstring;
+  new eiv:bitstring;
+  new tiv:bitstring;
+  let piv = add(mul(B,siv),eiv) in 
+  let Bv1 = xor(h(con(piv,h(con(con(TIDiv,EVTu),GIDv)))),EVTu) in 
+  let Bv2 = h(con(con(con(con(TIDiv,GIDv),piv),EVTu),tiv)) in
+  let M7 = (TIDiv,Bv1,Bv2,piv,tiv) in  
+  out(ch4,M7);
+
+  in(ch4,(EVpv:bitstring,EVvv:bitstring,EVBv3:bitstring,EVBv4:bitstring,EVBv5:bitstring,EVtGSv:bitstring));
+  let bi3 = add(mul(trans(EVpv),siv),eiv) in
+  let ki3 = rec(bi3,EVvv) in
+  let skiv = h(con(con(con(piv,EVpv),EVvv),ki3)) in
+  let EVTv = xor(EVBv3,h(con(EVpv,ki3))) in 
+  if EVB5 = h(con(con(con(con(GIDv,TIDiv),skiv),EVTv),EVtGSv)) then
+  event GS_auth3(GIDv);
+  0
+  ).
+
+
+(*------GSj's process----*)  
+let GSj =
+  in(sch2, GSkGSjCC:bitstring);
+  !
+ (
+  in(ch1,(GSPIDi:bitstring,GSpi:bitstring,GSA1:bitstring,GSA2:bitstring,GSA3:bitstring,GSti:bitstring));
+  event GS_start1(GIDj);
+  new rj: bitstring;
+  let A4 = xor(h(con(GIDj,GSkGSjCC)),rj) in
+  let A5 = xor(h(rj), h(GSpi)) in
+  let A6 = h(con(con(con(con(GSkGSjCC,rj),GIDj),h(GSpi)),GSti)) in
+  let M2 = (GSPIDi,GSA1,GSA2,GSA3,A4,A5,A6,GSti) in
+  out (ch2,M2);
+  
+  in(ch2,(GSA8:bitstring,GSA10:bitstring,GSA11:bitstring,GSA12:bitstring,GStCC:bitstring));
+  if GSA12 = h(con(con(GSkGSjCC,rj),GStCC)) then
+  new GSTIDiu:bitstring;
+  new sj:bitstring;
+  new ej:bitstring;
+  new ej2:bitstring;
+  let pj = add(mul(trans(B),sj),ej) in
+  let bj = add(mul(trans(sj),GSpi),ej2) in
+  let rtj = con2(bj) in
+  let kj = fst(rtj) in
+  let vj = snd(rtj) in
+  let skji = h(con(con(con(GSpi,pj),vj),kj)) in
+  let Tj = h(con(con(con(con(GIDj,GSPIDi),skji),GSti),GStCC)) in
+  let A13 = xor(h(con(pj,kj)),Tj) in
+  let A14 = xor(h(con(kj,pj)),GSTIDiu) in
+  let A15 = h(con(con(con(con(con(GIDj,GSPIDi),skji),Tj),GSTIDiu),GStCC)) in 
+  let M3 = (GSA8,GSA10,GSA11,pj,vj,A13,A14,A15,GStCC) in
+  let Mtrans = (GSTIDiu,Tj) in
+  out(ch1,M3);
+  out(sch3,Mtrans);
+  0
+  ). 
+
+let GSu =
+   in(sch3, GSkGSuCC:bitstring);
+  !
+ (
+  in(sch4,(GSTIDiu:bitstring,GSuTj:bitstring));
+  in(ch3,(GS2TIDiu:bitstring,GS2B1:bitstring,GS2B2:bitstring,GS2piu:bitstring,GS2tiu:bitstring));
+  if GSTIDiu = GS2TIDiu then
+  if GSuTj = xor(GS2B1,h(con(con(con(GS2piu,GSTIDiu),GSuTj),GIDu))) then
+  if GS2B2 = h(con(con(con(con(GS2TIDiu,GIDu),GS2piu),GSuTj),GS2tiu)) then
+  event EV_auth2(GS2TIDiu);
+  event GS_start2(GIDu);
+  new su:bitstring; 
+  new eu:bitstring;
+  new eu2:bitstring;
+  new GSTIDiv:bitstring;
+  new tGSu:bitstring;
+  let pu = add(mul(trans(B),su), eu) in
+  let bu = add(mul(trans(su),GS2piu),eu2) in
+  let rtu = con2(bu) in
+  let ku = fst(rtu) in
+  let vu = snd(rtu) in
+  let skui = h(con(con(con(GS2piu,pu),vu),ku)) in
+  let Tu = h(con(con(con(GIDu,GS2TIDiu),skui),tGSu)) in 
+  let B3 = xor(h(con(pu,ku)),Tu) in
+  let B4 = xor(h(con(ku,pu)),GSTIDiv) in
+  let B5 = h(con(con(con(con(con(GIDu,GS2TIDiu),skui),Tu),GSTIDiv),tGSu)) in
+  let M6 = (pu,vu,B3,B4,B5,tGSu) in
+  out (ch3,M6);
+  0
+  ). 
+
+let GSv =
+   in(sch4, GSkGSvCC:bitstring);
+  !
+ (
+  in(sch4,(GSTIDiv:bitstring,GSvTu:bitstring));
+  in(ch3,(GS3TIDiv:bitstring,GS3B1:bitstring,GS3B2:bitstring,GS3piv:bitstring,GS3tiv:bitstring));
+  if GSTIDiv = GS3TIDiv then
+  if GSvTu = xor(GS3B1,h(con(con(con(GS3piv,GS3TIDiv),GSvTu),GIDv))) then
+  if GS3B2 = h(con(con(con(con(GS3TIDiv,GIDv),GS3piv),GSvTu),GS3tiv)) then
+
+  event EV_auth3(GS3TIDiv);
+  event GS_start3(GIDv);
+  new sv:bitstring; 
+  new ev:bitstring;
+  new ev2:bitstring;
+  new tGSv:bitstring;
+  let pv = add(mul(trans(B),sv),ev) in
+  let bv = add(mul(trans(sv),GS3piv),ev2) in
+  let rtv = con2(bv) in
+  let kv = fst(rtv) in
+  let vv = snd(rtv) in
+  let skvi = h(con(con(con(GS3piv,pv),vv),kv)) in
+  let Tv = h(con(con(con(GIDv,GS3TIDiv),skvi),tGSv)) in 
+  let Bv3 = xor(h(con(pv,kv)),Tv) in
+  let Bv4 = xor(h(con(kv,pv)),GS3TIDiv) in
+  let Bv5 = h(con(con(con(con(GIDv,GS3TIDiv),skvi),Tv),tGSv)) in
+  let M8 = (pv,vv,Bv3,Bv4,Bv5,tGSv) in
+  out (ch4,M8);
+  0
+  ).
+  
+  
+(*------CC's process-------*)
+let CCReg1 =
+  in(sch1,(CCVIDi:bitstring,CCHPWi:bitstring));
+  new CCPIDi: bitstring;
+  let CCRI1=xor(h(con(CCPIDi,s)),CCID) in
+  let CCRI2=xor( h(con(CCVIDi,s)),h(con(CCVIDi,CCHPWi))) in
+  insert d(CCVIDi);
+  out (sch1,(CCRI1,CCRI2,CCPIDi)).
+
+let CCReg2 =
+   let kGSjCC = h(con(con(GIDj,CCID),s)) in
+   out (sch2,kGSjCC).
+
+let CCReg3 =
+   let kGSuCC = h(con(con(GIDu,CCID),s)) in
+   out (sch3,kGSuCC).
+
+let CCReg4 =
+   let kGSvCC = h(con(con(GIDv,CCID),s)) in
+   out (sch4,kGSvCC). 
+
+
+let CCAuth =
+  in(ch2,(CCPIDi1:bitstring,CCA1:bitstring,CCA2:bitstring,CCA3:bitstring,CCA4:bitstring,CCA5:bitstring,CCA6:bitstring,CCti:bitstring));
+  let CCai = xor(CCA1,h(con(con(CCPIDi1,s),CCID))) in
+  let CCVIDi = xor(CCA2,h(con(CCPIDi1,CCai))) in
+  get d(=CCVIDi) in
+  let kGSjCC = h(con(con(GIDj,CCID),s)) in 
+  let CCrj = xor(CCA4,h(con(GIDj,kGSjCC))) in
+  let hp = xor(CCA5,h(CCrj)) in
+  if CCA3 = h(con(con(con(con(con(CCPIDi1,CCVIDi),GIDj),CCai),hp),CCti)) then
+  event EV_auth1(CCVIDi);
+  if CCA6 = h(con(con(con(con(kGSjCC,CCrj),GIDj),hp),CCti)) then
+  event GS_auth1(GIDj);
+  new CCPIDinew: bitstring;
+  new CCtCC:bitstring;
+  let CCA7 = h(con(con(CCPIDinew,s),CCID)) in
+  let CCA8 = xor(CCA7,h(con(CCai,CCPIDi1))) in
+  let CCA9 = h(con(CCVIDi,s)) in
+  let CCA10 = xor(h(con(CCA9,CCai)),CCPIDinew) in
+  let CCA11 = h(con(con(con(con(CCPIDinew,CCVIDi),CCA7),CCai),CCtCC)) in
+  let CCA12 = h(con(con(kGSjCC,CCrj),CCtCC)) in
+  let M3 =(CCA8,CCA10,CCA11,CCA12,CCtCC) in
+  out(ch2,M3).
+  
+  
+
+
+  let CC = CCReg1 | CCReg2 | CCReg3 | CCAuth.
+  
+  process !EV | !GSj | !GSu | !GSv | !CC
+
+
+
+
+
