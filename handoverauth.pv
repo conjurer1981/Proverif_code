@@ -200,9 +200,9 @@ let GSj =
   let A13 = xor(h(con(pj,kj)),Tj) in
   let A14 = xor(h(con(kj,pj)),GSTIDiu) in
   let A15 = h(con(con(con(con(con(GIDj,GSPIDi),skji),Tj),GSTIDiu),GStCC)) in 
-  let M3 = (GSA8,GSA10,GSA11,pj,vj,A13,A14,A15,GStCC) in
+  let M4 = (GSA8,GSA10,GSA11,pj,vj,A13,A14,A15,GStCC) in
   let Mtrans = (GSTIDiu,Tj) in
-  out(ch1,M3);
+  out(ch1,M4);
   out(sch3,Mtrans);
   0
   ). 
@@ -321,6 +321,7 @@ let CCAuth =
   let CC = CCReg1 | CCReg2 | CCReg3 | CCAuth.
   
   process !EV | !GSj | !GSu | !GSv | !CC
+
 
 
 
