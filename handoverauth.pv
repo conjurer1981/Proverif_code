@@ -234,6 +234,7 @@ let GSu =
   let B4 = xor(h(con(ku,pu)),GSTIDiv) in
   let B5 = h(con(con(con(con(con(GIDu,GS2TIDiu),skui),Tu),GSTIDiv),tGSu)) in
   let M6 = (pu,vu,B3,B4,B5,tGSu) in
+  let Mtrans2 = (GSTIDiv,Tu) in
   out (ch3,M6);
   0
   ). 
@@ -321,6 +322,7 @@ let CCAuth =
   let CC = CCReg1 | CCReg2 | CCReg3 | CCAuth.
   
   process !EV | !GSj | !GSu | !GSv | !CC
+
 
 
 
