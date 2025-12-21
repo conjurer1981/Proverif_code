@@ -1,0 +1,378 @@
+(*--------channels----------*)
+free ch: channel. (*--public channel--*)
+free sch0: channel [private].
+free sch1: channel [private]. 
+free sch2: channel [private].
+free sch3: channel [private].
+
+
+(*-------shared keys--------*)
+free skij: bitstring [private]. (*---session key--*)
+free skji: bitstring [private].
+free skui: bitstring [private].
+free skiu: bitstring [private].
+free skvi: bitstring [private].
+free skiv: bitstring [private].
+free MKCS: bitstring [private]. (*---secret key of CS---*)
+
+(* private/public key *)
+type skey.
+type pkey.
+fun pk(skey): pkey.
+
+free skEVi:skey [private].
+free skGSj:skey [private].
+free skGSu:skey [private].
+free skGSv:skey [private].
+free skCS:skey  [private].
+
+(*--------functions------*)
+fun h(bitstring):bitstring. (*---hash function---*)
+fun con(bitstring,bitstring):bitstring. (*-----concatenation function---*)
+fun con1(pkey,bitstring):bitstring.(*-----concatenation function2---*)
+fun add(bitstring,bitstring):bitstring. (*---vector addition----*)
+fun mul(bitstring,bitstring):bitstring. (*---vector multiplication----*)
+fun xor(bitstring,bitstring):bitstring. (*---exclusive-or-----*)
+
+(*-----constants------------*)
+free EVIDi:bitstring [private]. (*---EVi's identity---*)
+free PWi:bitstring [private]. (*---EVi's password---*)
+free infoj:bitstring [private]. (*--information collected by GSj--*)
+
+
+const GSIDj:bitstring. (*---GSj's identity---*)
+const GSIDu:bitstring. (*---GSu's identity---*)
+const GSIDv:bitstring. (*---GSv's identity---*)
+const CSID:bitstring. (*---CS's identity---*)
+table d1(bitstring).   (*--table for storing EVIDi--*)
+table d2(bitstring).   (*--table for storing all GSIDs--*)
+table dEV(bitstring,bitstring,bitstring).
+
+weaksecret EVIDi.
+weaksecret PWi.
+
+
+(* KEM operation *)
+(*kem_encap and key_decap are for the ciphertext, while get_shared_key is for the temporary key*)
+fun kem_encap(pkey, bitstring): bitstring. 
+fun kem_decap(skey, bitstring): bitstring.
+fun get_shared_key(pkey, bitstring): bitstring.
+
+equation forall sk: skey, r: bitstring; kem_decap(sk, kem_encap(pk(sk), r)) = get_shared_key(pk(sk), r).
+
+(* symmetric encryption *)
+fun senc(bitstring, bitstring): bitstring.
+fun sdec(bitstring, bitstring): bitstring.
+equation forall m: bitstring, k: bitstring;  sdec(k, senc(k, m)) = m.
+
+
+(* xor operation *)
+equation forall m:bitstring,n:bitstring; xor(xor(m,n),n)=m.
+
+(*---events--*)
+(*the following events are for the start and end of the authentication processes*)
+event EV_start1(bitstring).
+event EV_auth1(bitstring).
+event EV_start2(bitstring).
+event EV_auth2(bitstring).
+event EV_start3(bitstring).
+event EV_auth3(bitstring).
+event GS_start1(bitstring).
+event GS_auth1(bitstring).
+event GS_start2(bitstring).
+event GS_auth2(bitstring).
+event GS_start3(bitstring).
+event GS_auth3(bitstring).
+
+(*--queries--*)
+
+query attacker (EVIDi).
+query attacker (PWi).
+query attacker (skij).
+query attacker (skji).
+query attacker (skui).
+query attacker (skiu).
+query attacker (skiv).
+query attacker (skvi).
+query attacker (MKCS).
+
+query x:bitstring; inj-event(EV_auth1(x))==>inj-event(EV_start1(x)).
+query x:bitstring; inj-event(EV_auth2(x))==>inj-event(EV_start2(x)).
+query x:bitstring; inj-event(EV_auth3(x))==>inj-event(EV_start1(x)).
+query x:bitstring; inj-event(GS_auth1(x))==>inj-event(GS_start1(x)).
+query x:bitstring; inj-event(GS_auth2(x))==>inj-event(GS_start2(x)).
+query x:bitstring; inj-event(GS_auth3(x))==>inj-event(GS_start3(x)).
+
+
+
+(*------EV process---------*)
+let EV(pkCS: pkey, pkGSj: pkey, pkGSu: pkey, pkGSv: pkey)=
+  new ri:bitstring;
+  let APWi = h(con(ri,PWi)) in
+  out(sch1,(EVIDi,APWi));
+  in(sch1,(PIDi:bitstring, RE1:bitstring,RE2:bitstring));
+  let RE3 = xor(h(con(PWi,EVIDi)),ri)  in
+  out(sch0,(RE1,RE3,PIDi));
+  !
+  (
+    (*---takingoff authentication--*)
+  in(sch0,(EVRE1:bitstring,EVRE2:bitstring,EVRE3:bitstring,EVPIDi:bitstring));
+  event EV_start1(EVIDi);
+  new c1:bitstring;
+  new c2:bitstring;
+  new rinew:bitstring;
+  new Ki:bitstring;
+  new t1:bitstring;
+  
+  let ri1 = xor(EVRE3,h(con(PWi,EVIDi))) in
+  let APWi1 = h(con(ri1,PWi)) in
+  let APWinew = h(con(rinew,PWi)) in
+  let RE3new =  xor(h(con(PWi,EVIDi)),rinew) in
+  let C1 = xor(EVRE1,h(con(EVIDi,APWi1))) in
+  let C2 = kem_encap(pkCS,c1) in
+  let K1 = get_shared_key(pkCS,c1) in
+  let C3 = senc(h(con(K1,C1)),(GSIDj,EVIDi)) in
+  let C4 = kem_encap(pkGSj,c2) in
+  let K2 = get_shared_key(pkGSj,c2) in
+  new skEVi1:skey;
+  let pkEVi1 = pk(skEVi1) in
+  let C5 = senc(h(con(K2,GSIDj)),(pkEVi1,Ki)) in
+  let C6 = h(con(con(con(con(con(K1,EVIDi),GSIDj),C1),EVPIDi),t1)) in
+  let C7 = h(con(con(con(con1(pkEVi1,K2),Ki),GSIDj),t1)) in
+  let M1 = (EVPIDi,C2,C3,C4,C5,C6,C7,t1) in 
+  out(ch,M1);
+  
+  in (ch,(EVC13:bitstring,EVC14:bitstring,EVC16:bitstring,EVC17:bitstring,EVC18:bitstring,EVC19:bitstring,EVt2:bitstring));
+  let (PIDinew:bitstring,C19:bitstring) = sdec(h(con(K1,PIDi)),EVC13) in
+  if EVC14 = h(con(con(con(con(con(K1,C19),PIDinew),PIDi),EVIDi),EVt2)) then
+  let RE1new = xor(C19,h(con(EVIDi,APWinew))) in
+  let EVK4 = kem_decap(skEVi1,EVC16) in
+  let EVK5 = kem_decap(skEVi,EVC17) in
+  let (TIDiu:bitstring,Tokeniu:bitstring,EVKj:bitstring) = sdec(h(con(con(EVK4,EVK5),PIDi)),EVC18) in
+  let SKij = h(con(Ki,EVKj)) in
+ 
+  if EVC19 = h(con(con(con(con(con(con(con(con(con(EVK4,EVK5),EVC13),EVC14),TIDiu),Tokeniu),SKij),Ki),EVKj),EVt2)) then
+  out(sch0,(RE1new,RE3new,PIDinew));
+
+  (*-----handover----*)
+  event EV_start2(TIDiu);
+  new b1:bitstring;
+  new Ki2:bitstring;
+  new t3:bitstring;
+  let B1 = kem_encap(pkGSu,b1) in
+  let K5 = get_shared_key(pkGSu,b1) in
+  new skEVi2:skey;
+  let pkEVi2 = pk(skEVi2) in
+  let B2 = senc(h(con(K5,GSIDu)),(pkEVi2,TIDiu,Ki2)) in
+  let B3 = h(con(con(con(con(con(con1(pkEVi2,K5),Ki2),TIDiu),Tokeniu),GSIDu),t3)) in
+  let M5 = (B1,B2,B3,t3) in  
+  out(ch,M5);
+
+  in(ch,(EVB4:bitstring,EVB5:bitstring,EVB6:bitstring,EVB7:bitstring,EVt4:bitstring));
+  let EVK6 = kem_decap(skEVi2,EVB4) in
+  let EVK7 = kem_decap(skEVi,EVB5) in
+  let (TIDiv:bitstring,Tokeniv:bitstring,EVKu:bitstring) = sdec(h(con(con(EVK6,EVK7),Tokeniu)),EVB6) in
+  let skiu = h(con(Ki2,EVKu)) in
+  if EVB7 = h(con(con(con(con(con(con(con(EVK6,EVK7),TIDiv),Tokeniv),skiu),Ki2),EVKu),EVt4)) then
+  event GS_auth2(GSIDu);
+
+  (*---handover at last GSv--*)
+  event EV_start2(TIDiv);
+  new b1v:bitstring;
+  new Ki2v:bitstring;
+  new t3v:bitstring;
+  let B1v = kem_encap(pkGSv,b1v) in
+  let K5v = get_shared_key(pkGSv,b1v) in
+  new skEVi3:skey;
+  let pkEVi3 = pk(skEVi3) in
+  let B2v = senc(h(con(K5v,GSIDv)),(pkEVi3,TIDiv,Ki2v)) in
+  let B3v = h(con(con(con(con(con(con1(pkEVi3,K5v),Ki2v),TIDiv),Tokeniv),GSIDv),t3v)) in
+  let M7 = (B1v,B2v,B3v,t3v) in  
+  out(ch,M7);
+
+  in(ch,(EVB4v:bitstring,EVB5v:bitstring,EVB6v:bitstring,EVB7v:bitstring,EVt4v:bitstring));
+  let EVK6v = kem_decap(skEVi3,EVB4v) in
+  let EVK7v = kem_decap(skEVi,EVB5v) in
+  let EVKv = sdec(h(con(con(EVK6v,EVK7v),Tokeniu)),EVB5v) in
+  let skiv = h(con(Ki2,EVKv)) in
+  if EVB6v = h(con(con(con(con(con(con(con(EVK6v,EVK7v),TIDiv),Tokeniv),skiv),Ki2v),EVKv),EVt4v)) then
+  event GS_auth3(GSIDv);
+  0
+  ).
+
+
+(*------GSj's process----*)  
+let GSj(pkCS: pkey, pkEVi: pkey) =
+  out (sch1, GSIDj);
+  !
+ (
+  in(ch,(GSPIDi:bitstring,GSC2:bitstring,GSC3:bitstring,GSC4:bitstring,GSC5:bitstring,GSC6:bitstring,GSC7:bitstring,GSt1:bitstring));
+  event GS_start1(GSIDj);
+  let GSK2 = kem_decap(skGSj,GSC2) in
+  let (GSpkEVi1:pkey,GSKi:bitstring) = sdec(h(con(GSK2,GSIDj)),GSC5) in
+  if GSC7 = h(con(con(con(con(GSpkEVi1,GSK2),GSKi),GSIDj),GSt1)) then
+  new c3: bitstring;
+  let C8 = kem_encap(pkCS,c3) in
+  let K3 = get_shared_key(pkCS,c3) in
+  let C9 = senc(h(con(K3,GSIDj)),infoj) in
+  let C10 = h(con(con(con(con(con(con(con(K3,GSC2),GSC3),GSC6),GSPIDi),C9),infoj),GSt1)) in
+  let M2 = (GSPIDi,GSC2,GSC3,GSC6,C8,C9,C10,GSt1) in
+  out (ch,M2);
+  
+  in(ch,(GSC13:bitstring,GSC14:bitstring,GSC15:bitstring,GSt2:bitstring));
+  if GSC15 =  h(con(con(con(con(K3,GSIDj),GSC13),GSC14),GSt2)) then
+  new c4:bitstring;
+  new c5:bitstring;
+  new Kj:bitstring;
+  new GSTIDiu:bitstring;
+  new GSTokeniu:bitstring;
+  let C16 = kem_encap(GSpkEVi1,c4) in
+  let K4 = get_shared_key(GSpkEVi1,c4) in
+  let C17 = kem_encap(pkEVi,c5) in
+  let K5 = get_shared_key(pkEVi,c5) in
+  let C18 = senc(h(con(con(K4,K5),GSPIDi)),(GSTIDiu,GSTokeniu,Kj)) in
+  let SKji = h(con(GSKi,Kj)) in
+  let C19 = h(con(con(con(con(con(con(con(con(con(K4,K5),GSC13),GSC14),GSTIDiu),GSTokeniu),SKji),GSKi),Kj),GSt2)) in 
+  let M4 = (GSC13,GSC14,C16,C17,C18,C19,GSt2) in
+  let Mtrans = (GSTIDiu,GSTokeniu,GSt2) in
+  out(ch,M4);
+  out(sch2,Mtrans);
+  0
+  ). 
+
+(*------GSu's process----*)  
+let GSu(pkEVi: pkey) =
+  out(sch1, GSIDu);
+  !
+ (
+  in(sch2,(GSuTIDiu:bitstring,GSuTokeniu:bitstring,GSut2:bitstring));
+  in(ch,(GSuB1:bitstring,GSuB2:bitstring,GSuB3:bitstring,GSut3:bitstring));
+  let GSuK5 = kem_decap(skGSu,GSuB1) in
+  let (GSupkEVi2:pkey,GSuTIDiu2:bitstring,GSuKi2:bitstring) = sdec(h(con(GSuK5,GSIDu)),GSuB2) in
+  if GSuTIDiu = GSuTIDiu2 then
+  if GSuB3 = h(con(con(con(con(con(GSuK5,GSuKi2),GSuTIDiu2),GSuTokeniu),GSIDu),GSut3)) then
+  event EV_auth2(GSuTIDiu2);
+  event GS_start2(GSIDu);
+  new b2:bitstring;
+  new b3:bitstring;
+  new Ku:bitstring;
+  new GSuTIDiv:bitstring;
+  new GSuTokeniv:bitstring;
+  new t4:bitstring;
+  let B4 = kem_encap(GSupkEVi2,b2) in
+  let K6 = get_shared_key(GSupkEVi2,b2) in
+  let B5 = kem_encap(pkEVi,b2) in
+  let K7 = get_shared_key(pkEVi,b2) in
+  let B6 = senc(h(con(con(K6,K7),GSuTokeniu)),(GSuTIDiv,GSuTokeniv,Ku)) in
+  let SKui = h(con(GSuKi2,Ku)) in
+  let B7 = h(con(con(con(con(con(con(con(K6,K7),GSuTIDiv),GSuTokeniv),skui),GSuKi2),Ku),t4)) in
+  let M6 = (B4,B5,B6,B7,t4) in
+  let Mtrans2 = (GSuTIDiv,GSuTokeniv,t4) in
+  out (sch3,Mtrans2);
+  out (ch,M6);
+  0
+  ). 
+
+(*------GSv's process----*)  
+
+let GSv(pkEVi: pkey) =
+  out(sch1, GSIDv);
+  !
+ (
+  in(sch3,(GSvTIDiv:bitstring,GSvTokeniv:bitstring,GSvt4:bitstring));
+  in(ch,(GSvB1:bitstring,GSvB2:bitstring,GSvB3:bitstring,GSvt3:bitstring));
+  let GSvK5 = kem_decap(skGSv,GSvB1) in
+  let (GSvpkEVi3:pkey,GSvTIDiv2:bitstring,GSvKi2:bitstring) = sdec(h(con(GSvK5,GSIDv)),GSvB2) in
+  if GSvTIDiv = GSvTIDiv2 then
+  if GSvB3 = h(con(con(con(con(con(GSvK5,GSvKi2),GSvTIDiv2),GSvTokeniv),GSIDv),GSvt3)) then
+  event EV_auth2(GSvTIDiv2);
+  event GS_start2(GSIDv);
+  new b2v:bitstring;
+  new b3v:bitstring;
+  new Kv:bitstring;
+  new t4v:bitstring;
+  let B4v = kem_encap(GSvpkEVi3,b2v) in
+  let K6v = get_shared_key(GSvpkEVi3,b2v) in
+  let B5v = kem_encap(pkEVi,b3v) in
+  let K7v = get_shared_key(pkEVi,b2v) in
+  let B6v = senc(h(con(con(K6v,K7v),GSvTokeniv)),Kv) in
+  let SKvi = h(con(GSvKi2,Kv)) in
+  let B7v = h(con(con(con(con(con(con(con(K6v,K7v),GSvTIDiv),GSvTokeniv),skvi),GSvKi2),Kv),t4v)) in
+  let M8 = (B4v,B5v,B6v,B7v,t4v) in
+  out (ch,M8);
+  0
+  ).
+  
+  
+(*------CS's process-------*)
+let CSReg1 =
+  in(sch1,(CSEVIDi:bitstring,CSAPWi:bitstring));
+  new CSPIDi: bitstring;
+  let CSRE1 = xor(h(con(con(CSPIDi,CSID),MKCS)),h(con(CSEVIDi,CSAPWi))) in
+  let CSRE2 = xor(h(con(CSEVIDi,MKCS)),h(CSAPWi)) in
+  insert d1(CSEVIDi);
+  out (sch1,(CSPIDi,CSRE1,CSRE2)).
+
+let CSReg2 =
+   in(sch1,CSGSIDj:bitstring);
+   insert d2(CSGSIDj).
+
+let CSReg3 =
+   in(sch1,CSGSIDu:bitstring);
+   insert d2(CSGSIDu).
+
+let CSReg4 =
+   in(sch1,CSGSIDv:bitstring);
+   insert d2(CSGSIDv).
+
+
+let CSAuth =
+  in(ch,(CSPIDi1:bitstring,CSC2:bitstring,CSC3:bitstring,CSC6:bitstring,CSC8:bitstring,CSC9:bitstring,CSC10:bitstring,CSt1:bitstring));
+  (* This line was missing in the original CSAuth process, but it's needed to construct C11 *)
+  let C11 = h(con(con(CSPIDi1,CSID),MKCS)) in
+  let CSK1 = kem_decap(skCS,CSC2) in
+  let (CSGSIDj1:bitstring,CSEVIDi1:bitstring) = sdec(h(con(CSK1,C11)),CSC3) in
+  get d1(=CSEVIDi1) in
+  get d2(=CSGSIDj1) in
+  (* Original code had a typo here: CSEVIDi should be CSEVIDi1 *)
+  if CSC6 = h(con(con(con(con(con(CSK1,CSEVIDi1),CSGSIDj1),C11),CSPIDi1),CSt1)) then
+  event EV_auth1(CSEVIDi1);
+  let CSK3 = kem_decap(skCS,CSC8) in
+  let CSinfo = sdec(h(con(CSK3,CSGSIDj1)),CSC9) in
+  (* Original code had a typo here: CSinfoj should be CSinfo *)
+  if CSC10 = h(con(con(con(con(con(con(con(CSK3,CSC2),CSC3),CSC6),CSPIDi1),CSC9),CSinfo),CSt1)) then
+  event GS_auth1(CSGSIDj1);
+  new CSPIDinew:bitstring;
+  new t2:bitstring;
+  let C12 = h(con(con(CSPIDinew,CSID),MKCS)) in
+  let C13 = senc(h(con(CSK1,CSPIDi1)),(CSPIDinew,C12)) in
+  let C14 = h(con(con(con(con(con(CSK1,C12),CSPIDinew),CSPIDi1),CSEVIDi1),t2)) in
+  let C15 = h(con(con(con(con(CSK3,CSGSIDj1),C13),C14),t2)) in
+  let M3 =(C13,C14,C15,t2) in
+  out(ch,M3).
+
+(* Combine all CS subprocesses *)
+let CS = CSReg1 | CSReg2 | CSReg3 | CSReg4 | CSAuth.
+
+(*------ Main Process Block ---------*)
+process
+  (* 1. Define all public keys in the top-level scope *)
+  let pkEVi = pk(skEVi) in
+  let pkCS = pk(skCS) in
+  let pkGSj = pk(skGSj) in
+  let pkGSu = pk(skGSu) in
+  let pkGSv = pk(skGSv) in
+
+  (* 2. Announce the public keys on the public channel *)
+  out(ch, pkEVi) |
+  out(ch, pkCS) |
+  out(ch, pkGSj) |
+  out(ch, pkGSu) |
+  out(ch, pkGSv) |
+
+  (* 3. Start all the parallel processes *)
+  !EV(pkCS, pkGSj, pkGSu, pkGSv) |
+  !GSj(pkCS, pkEVi) |
+  !GSu(pkEVi) |
+  !GSv(pkEVi) |
+  !CS
