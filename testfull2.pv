@@ -30,8 +30,6 @@ free skCS:skey  [private].
 fun h(bitstring):bitstring. (*---hash function---*)
 fun con(bitstring,bitstring):bitstring. (*-----concatenation function---*)
 fun con1(pkey,bitstring):bitstring.(*-----concatenation function2---*)
-fun add(bitstring,bitstring):bitstring. (*---vector addition----*)
-fun mul(bitstring,bitstring):bitstring. (*---vector multiplication----*)
 fun xor(bitstring,bitstring):bitstring. (*---exclusive-or-----*)
 
 (*-----constants------------*)
@@ -53,12 +51,12 @@ weaksecret PWi.
 
 
 (* KEM operation *)
-(*kem_encap and key_decap are for the ciphertext, while get_shared_key is for the temporary key*)
-fun kem_encap(pkey, bitstring): bitstring. 
-fun kem_decap(skey, bitstring): bitstring.
+(*kem_encaps and key_decaps are for the ciphertext, while get_shared_key is for the temporary key*)
+fun kem_encaps(pkey, bitstring): bitstring. 
+fun kem_decaps(skey, bitstring): bitstring.
 fun get_shared_key(pkey, bitstring): bitstring.
 
-equation forall sk: skey, r: bitstring; kem_decap(sk, kem_encap(pk(sk), r)) = get_shared_key(pk(sk), r).
+equation forall sk: skey, r: bitstring; kem_decaps(sk, kem_encaps(pk(sk), r)) = get_shared_key(pk(sk), r).
 
 (* symmetric encryption *)
 fun senc(bitstring, bitstring): bitstring.
@@ -127,17 +125,18 @@ let EV(pkCS: pkey, pkGSj: pkey, pkGSu: pkey, pkGSv: pkey)=
   let ri1 = xor(EVRE3,h(con(PWi,EVIDi))) in
   let APWi1 = h(con(ri1,PWi)) in
   let APWinew = h(con(rinew,PWi)) in
+  let RE2new = xor(xor(RE2,APWi),APWinew) in
   let RE3new =  xor(h(con(PWi,EVIDi)),rinew) in
   let C1 = xor(EVRE1,h(con(EVIDi,APWi1))) in
-  let C2 = kem_encap(pkCS,c1) in
+  let C2 = kem_encaps(pkCS,c1) in
   let K1 = get_shared_key(pkCS,c1) in
   let C3 = senc(h(con(K1,C1)),(GSIDj,EVIDi)) in
-  let C4 = kem_encap(pkGSj,c2) in
+  let C4 = kem_encaps(pkGSj,c2) in
   let K2 = get_shared_key(pkGSj,c2) in
   new skEVi1:skey;
   let pkEVi1 = pk(skEVi1) in
   let C5 = senc(h(con(K2,GSIDj)),(pkEVi1,Ki)) in
-  let C6 = h(con(con(con(con(con(K1,EVIDi),GSIDj),C1),EVPIDi),t1)) in
+  let C6 = h(con(con(con(con(con(con(K1,EVIDi),GSIDj),xor(RE2,APWi)),C1),EVPIDi),t1)) in
   let C7 = h(con(con(con(con1(pkEVi1,K2),Ki),GSIDj),t1)) in
   let M1 = (EVPIDi,C2,C3,C4,C5,C6,C7,t1) in 
   out(ch,M1);
@@ -146,20 +145,20 @@ let EV(pkCS: pkey, pkGSj: pkey, pkGSu: pkey, pkGSv: pkey)=
   let (PIDinew:bitstring,C19:bitstring) = sdec(h(con(K1,PIDi)),EVC13) in
   if EVC14 = h(con(con(con(con(con(K1,C19),PIDinew),PIDi),EVIDi),EVt2)) then
   let RE1new = xor(C19,h(con(EVIDi,APWinew))) in
-  let EVK4 = kem_decap(skEVi1,EVC16) in
-  let EVK5 = kem_decap(skEVi,EVC17) in
+  let EVK4 = kem_decaps(skEVi1,EVC16) in
+  let EVK5 = kem_decaps(skEVi,EVC17) in
   let (TIDiu:bitstring,Tokeniu:bitstring,EVKj:bitstring) = sdec(h(con(con(EVK4,EVK5),PIDi)),EVC18) in
   let SKij = h(con(Ki,EVKj)) in
  
   if EVC19 = h(con(con(con(con(con(con(con(con(con(EVK4,EVK5),EVC13),EVC14),TIDiu),Tokeniu),SKij),Ki),EVKj),EVt2)) then
-  out(sch0,(RE1new,RE3new,PIDinew));
+  out(sch0,(RE1new,RE2new,RE3new,PIDinew));
 
   (*-----handover----*)
   event EV_start2(TIDiu);
   new b1:bitstring;
   new Ki2:bitstring;
   new t3:bitstring;
-  let B1 = kem_encap(pkGSu,b1) in
+  let B1 = kem_encaps(pkGSu,b1) in
   let K5 = get_shared_key(pkGSu,b1) in
   new skEVi2:skey;
   let pkEVi2 = pk(skEVi2) in
@@ -169,8 +168,8 @@ let EV(pkCS: pkey, pkGSj: pkey, pkGSu: pkey, pkGSv: pkey)=
   out(ch,M5);
 
   in(ch,(EVB4:bitstring,EVB5:bitstring,EVB6:bitstring,EVB7:bitstring,EVt4:bitstring));
-  let EVK6 = kem_decap(skEVi2,EVB4) in
-  let EVK7 = kem_decap(skEVi,EVB5) in
+  let EVK6 = kem_decaps(skEVi2,EVB4) in
+  let EVK7 = kem_decaps(skEVi,EVB5) in
   let (TIDiv:bitstring,Tokeniv:bitstring,EVKu:bitstring) = sdec(h(con(con(EVK6,EVK7),Tokeniu)),EVB6) in
   let skiu = h(con(Ki2,EVKu)) in
   if EVB7 = h(con(con(con(con(con(con(con(EVK6,EVK7),TIDiv),Tokeniv),skiu),Ki2),EVKu),EVt4)) then
@@ -181,7 +180,7 @@ let EV(pkCS: pkey, pkGSj: pkey, pkGSu: pkey, pkGSv: pkey)=
   new b1v:bitstring;
   new Ki2v:bitstring;
   new t3v:bitstring;
-  let B1v = kem_encap(pkGSv,b1v) in
+  let B1v = kem_encaps(pkGSv,b1v) in
   let K5v = get_shared_key(pkGSv,b1v) in
   new skEVi3:skey;
   let pkEVi3 = pk(skEVi3) in
@@ -191,8 +190,8 @@ let EV(pkCS: pkey, pkGSj: pkey, pkGSu: pkey, pkGSv: pkey)=
   out(ch,M7);
 
   in(ch,(EVB4v:bitstring,EVB5v:bitstring,EVB6v:bitstring,EVB7v:bitstring,EVt4v:bitstring));
-  let EVK6v = kem_decap(skEVi3,EVB4v) in
-  let EVK7v = kem_decap(skEVi,EVB5v) in
+  let EVK6v = kem_decaps(skEVi3,EVB4v) in
+  let EVK7v = kem_decaps(skEVi,EVB5v) in
   let EVKv = sdec(h(con(con(EVK6v,EVK7v),Tokeniu)),EVB5v) in
   let skiv = h(con(Ki2,EVKv)) in
   if EVB6v = h(con(con(con(con(con(con(con(EVK6v,EVK7v),TIDiv),Tokeniv),skiv),Ki2v),EVKv),EVt4v)) then
@@ -208,11 +207,11 @@ let GSj(pkCS: pkey, pkEVi: pkey) =
  (
   in(ch,(GSPIDi:bitstring,GSC2:bitstring,GSC3:bitstring,GSC4:bitstring,GSC5:bitstring,GSC6:bitstring,GSC7:bitstring,GSt1:bitstring));
   event GS_start1(GSIDj);
-  let GSK2 = kem_decap(skGSj,GSC2) in
+  let GSK2 = kem_decaps(skGSj,GSC2) in
   let (GSpkEVi1:pkey,GSKi:bitstring) = sdec(h(con(GSK2,GSIDj)),GSC5) in
-  if GSC7 = h(con(con(con(con(GSpkEVi1,GSK2),GSKi),GSIDj),GSt1)) then
+  if GSC7 = h(con(con(con(con1(GSpkEVi1,GSK2),GSKi),GSIDj),GSt1)) then
   new c3: bitstring;
-  let C8 = kem_encap(pkCS,c3) in
+  let C8 = kem_encaps(pkCS,c3) in
   let K3 = get_shared_key(pkCS,c3) in
   let C9 = senc(h(con(K3,GSIDj)),infoj) in
   let C10 = h(con(con(con(con(con(con(con(K3,GSC2),GSC3),GSC6),GSPIDi),C9),infoj),GSt1)) in
@@ -226,9 +225,9 @@ let GSj(pkCS: pkey, pkEVi: pkey) =
   new Kj:bitstring;
   new GSTIDiu:bitstring;
   new GSTokeniu:bitstring;
-  let C16 = kem_encap(GSpkEVi1,c4) in
+  let C16 = kem_encaps(GSpkEVi1,c4) in
   let K4 = get_shared_key(GSpkEVi1,c4) in
-  let C17 = kem_encap(pkEVi,c5) in
+  let C17 = kem_encaps(pkEVi,c5) in
   let K5 = get_shared_key(pkEVi,c5) in
   let C18 = senc(h(con(con(K4,K5),GSPIDi)),(GSTIDiu,GSTokeniu,Kj)) in
   let SKji = h(con(GSKi,Kj)) in
@@ -247,7 +246,7 @@ let GSu(pkEVi: pkey) =
  (
   in(sch2,(GSuTIDiu:bitstring,GSuTokeniu:bitstring,GSut2:bitstring));
   in(ch,(GSuB1:bitstring,GSuB2:bitstring,GSuB3:bitstring,GSut3:bitstring));
-  let GSuK5 = kem_decap(skGSu,GSuB1) in
+  let GSuK5 = kem_decaps(skGSu,GSuB1) in
   let (GSupkEVi2:pkey,GSuTIDiu2:bitstring,GSuKi2:bitstring) = sdec(h(con(GSuK5,GSIDu)),GSuB2) in
   if GSuTIDiu = GSuTIDiu2 then
   if GSuB3 = h(con(con(con(con(con(GSuK5,GSuKi2),GSuTIDiu2),GSuTokeniu),GSIDu),GSut3)) then
@@ -259,9 +258,9 @@ let GSu(pkEVi: pkey) =
   new GSuTIDiv:bitstring;
   new GSuTokeniv:bitstring;
   new t4:bitstring;
-  let B4 = kem_encap(GSupkEVi2,b2) in
+  let B4 = kem_encaps(GSupkEVi2,b2) in
   let K6 = get_shared_key(GSupkEVi2,b2) in
-  let B5 = kem_encap(pkEVi,b2) in
+  let B5 = kem_encaps(pkEVi,b2) in
   let K7 = get_shared_key(pkEVi,b2) in
   let B6 = senc(h(con(con(K6,K7),GSuTokeniu)),(GSuTIDiv,GSuTokeniv,Ku)) in
   let SKui = h(con(GSuKi2,Ku)) in
@@ -281,7 +280,7 @@ let GSv(pkEVi: pkey) =
  (
   in(sch3,(GSvTIDiv:bitstring,GSvTokeniv:bitstring,GSvt4:bitstring));
   in(ch,(GSvB1:bitstring,GSvB2:bitstring,GSvB3:bitstring,GSvt3:bitstring));
-  let GSvK5 = kem_decap(skGSv,GSvB1) in
+  let GSvK5 = kem_decaps(skGSv,GSvB1) in
   let (GSvpkEVi3:pkey,GSvTIDiv2:bitstring,GSvKi2:bitstring) = sdec(h(con(GSvK5,GSIDv)),GSvB2) in
   if GSvTIDiv = GSvTIDiv2 then
   if GSvB3 = h(con(con(con(con(con(GSvK5,GSvKi2),GSvTIDiv2),GSvTokeniv),GSIDv),GSvt3)) then
@@ -291,9 +290,9 @@ let GSv(pkEVi: pkey) =
   new b3v:bitstring;
   new Kv:bitstring;
   new t4v:bitstring;
-  let B4v = kem_encap(GSvpkEVi3,b2v) in
+  let B4v = kem_encaps(GSvpkEVi3,b2v) in
   let K6v = get_shared_key(GSvpkEVi3,b2v) in
-  let B5v = kem_encap(pkEVi,b3v) in
+  let B5v = kem_encaps(pkEVi,b3v) in
   let K7v = get_shared_key(pkEVi,b2v) in
   let B6v = senc(h(con(con(K6v,K7v),GSvTokeniv)),Kv) in
   let SKvi = h(con(GSvKi2,Kv)) in
@@ -328,18 +327,15 @@ let CSReg4 =
 
 let CSAuth =
   in(ch,(CSPIDi1:bitstring,CSC2:bitstring,CSC3:bitstring,CSC6:bitstring,CSC8:bitstring,CSC9:bitstring,CSC10:bitstring,CSt1:bitstring));
-  (* This line was missing in the original CSAuth process, but it's needed to construct C11 *)
   let C11 = h(con(con(CSPIDi1,CSID),MKCS)) in
-  let CSK1 = kem_decap(skCS,CSC2) in
+  let CSK1 = kem_decaps(skCS,CSC2) in
   let (CSGSIDj1:bitstring,CSEVIDi1:bitstring) = sdec(h(con(CSK1,C11)),CSC3) in
   get d1(=CSEVIDi1) in
   get d2(=CSGSIDj1) in
-  (* Original code had a typo here: CSEVIDi should be CSEVIDi1 *)
-  if CSC6 = h(con(con(con(con(con(CSK1,CSEVIDi1),CSGSIDj1),C11),CSPIDi1),CSt1)) then
+  if CSC6 = h(con(con(con(con(con(con(CSK1,CSEVIDi1),CSGSIDj1),h(con(CSEVIDi1,MKCS))),C11),CSPIDi1),CSt1)) then
   event EV_auth1(CSEVIDi1);
-  let CSK3 = kem_decap(skCS,CSC8) in
+  let CSK3 = kem_decaps(skCS,CSC8) in
   let CSinfo = sdec(h(con(CSK3,CSGSIDj1)),CSC9) in
-  (* Original code had a typo here: CSinfoj should be CSinfo *)
   if CSC10 = h(con(con(con(con(con(con(con(CSK3,CSC2),CSC3),CSC6),CSPIDi1),CSC9),CSinfo),CSt1)) then
   event GS_auth1(CSGSIDj1);
   new CSPIDinew:bitstring;
